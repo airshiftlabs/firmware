@@ -56,7 +56,9 @@ const char *TAG = "MAIN";
 /******************************************************************************/
 
 /* There is possibility to listen for various device events, related for example to setup process */
-static void on_device_event(const ChipDeviceEvent *event, intptr_t arg) {}
+static void on_device_event(const ChipDeviceEvent *event, intptr_t arg) {
+    Serial.println("on_device_event");
+}
 
 static esp_err_t on_identification(identification::callback_type_t type, uint16_t endpoint_id,
                                    uint8_t effect_id, void *priv_data) {
@@ -80,26 +82,43 @@ static void matter_init(void) {
 
     /* Start Matter device */
     esp_matter::start(on_device_event);
-
-    /* Print codes needed to setup Matter device */
-    PrintOnboardingCodes(chip::RendezvousInformationFlags(chip::RendezvousInformationFlag::kSoftAP));
 }
 
-/* Blink RGB LEDs */
-static void blink_led(void){
+static void update_led(int co2){
     for(size_t i = 0; i < NUM_LEDS; i++){
-        /* Turn the LED on, then pause */
-        leds[i] = CRGB::Red;
-        FastLED.show();
-    }
-    delay(500);
+        // 400 ppm: average outdoor air level.
+        // 400–1,000 ppm: typical level found in occupied spaces with good air exchange.
+        // 1,000–2,000 ppm: level associated with complaints of drowsiness and poor air.
+        // 2,000–5,000 ppm: level associated with headaches, sleepiness, and stagnant, stale, stuffy air. Poor concentration, loss of attention, increased heart rate and slight nausea may also be present.
+        // 5,000 ppm: this indicates unusual air conditions where high levels of other gases could also be present. Toxicity or oxygen deprivation could occur. This is the permissible exposure limit for daily workplace exposures.
+        // 40,000 ppm: this level is immediately harmful due to oxygen deprivation.
 
-    for(size_t i = 0; i < NUM_LEDS; i++){
-        /* Now turn the LED off, then pause */
-        leds[i] = CRGB::Black;
+        if (co2 < 1000) {
+            // Excellent
+            leds[i] = CRGB::Green;
+        } else if (co2 < 1500) {
+            // Mediocre
+            leds[i] = CRGB::Yellow;
+        } else if (co2 < 2000) {
+            // Unhealthy
+            leds[i] = CRGB::Orange;
+        } else if (co2 < 2500) {
+            // Very unhealthy
+            leds[i] = CRGB::Red;
+        } else  {
+            // Hazardous
+            // blink if co2 is too high
+            if (millis() % 1000 < 500) {
+                leds[i] = CRGB::Black;
+            } else {
+                leds[i] = CRGB::Purple;
+            }
+        }
+
+
         FastLED.show();
+        // todo fade to values
     }
-    delay(500);
 }
 
 /******************************************************************************/
@@ -118,7 +137,7 @@ void setup() {
     digitalWrite(TFT_BACKLIGHT, HIGH);
 
     /* LED init */
-    FastLED.addLeds<SK6812, DATA_PIN, RGB>(leds, NUM_LEDS);
+    FastLED.addLeds<SK6812, DATA_PIN, GRB>(leds, NUM_LEDS);
 
     /* LCD init */
     lvgl_gui_init();
@@ -133,6 +152,7 @@ void setup() {
   
     bool connected = false;
     int timeout = 0;
+    
     do {
         delay(1000);
         chip::DeviceLayer::Internal::ESP32Utils::IsStationConnected(connected);
@@ -140,7 +160,17 @@ void setup() {
             break;
         }
         Serial.println("Waiting for provisioning");
-    } while ((!connected) && (timeout++ < 30));
+        
+        /* Print codes needed to setup Matter device */
+        char payloadBuffer[256];
+        chip::MutableCharSpan qrCode(payloadBuffer);
+        if (GetQRCode(qrCode, chip::RendezvousInformationFlags(chip::RendezvousInformationFlag::kBLE)) == CHIP_NO_ERROR) {
+            // GetQRCodeUrl(url, sizeof(url), qrCode);
+            Serial.print("Matter QR Code: ");
+            Serial.println(qrCode.data());
+        }
+        
+    } while ((!connected));
     Serial.println("Finished provisioning");
 
     lvgl_gui_sensor_start();
@@ -148,9 +178,6 @@ void setup() {
     /* MQTT init */
     mqtt_api_init();
 }
-
-char payloadBuffer[256];
-char url[256];
 
 void loop() {
     static uint32_t last_print_ms = millis();
@@ -176,13 +203,6 @@ void loop() {
 
     /* Display the sensors result on the LCD */
     lvgl_gui_print(Co2, result.t, PM2);
-    blink_led();
-
-    /* Print codes needed to setup Matter device */
-    chip::MutableCharSpan qrCode(payloadBuffer);
-    if (GetQRCode(qrCode, chip::RendezvousInformationFlags(chip::RendezvousInformationFlag::kSoftAP)) == CHIP_NO_ERROR) {
-        GetQRCodeUrl(url, sizeof(url), qrCode);
-        Serial.println(url);
-    }
+    update_led(Co2);
 }
 
