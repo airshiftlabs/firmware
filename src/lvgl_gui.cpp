@@ -236,6 +236,7 @@ void lvgl_gui_sensor_start(void){
 void lvgl_gui_print(int co2, float temp, int pm2){
     static char temp_str[8];
     static char pm_str[8];
+    static char co2_str[8];
 
     uint8_t temp_value = (uint8_t) temp;
     temp_value = (temp_value > TEMP_MAX) ? TEMP_MAX : temp_value;
@@ -243,6 +244,9 @@ void lvgl_gui_print(int co2, float temp, int pm2){
     int pm_value = (pm2 > PM2_MAX) ? PM2_MAX : pm2;
 
     lv_arc_set_value(arc_co2, co2_value * 100 / CO2_MAX);
+    sprintf(co2_str, "%d", co2_value);
+    lv_label_set_text(label_co2_value, co2_str);
+
     sprintf(temp_str, "T: %d", temp_value);
     lv_label_set_text(label_temp, temp_str);
     sprintf(pm_str, "PM: %d", pm2);
