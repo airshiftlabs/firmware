@@ -1,15 +1,3 @@
-/*
- *  main.cpp
- *
- *  Created on: Jul 6, 2023
- */
-
-/******************************************************************************/
-
-/******************************************************************************/
-/*                              INCLUDE FILES                                 */
-/******************************************************************************/
-
 #include <Arduino.h>
 #include <Matter.h>
 #include <ESP32Utils.h>
@@ -25,34 +13,12 @@ using namespace chip::app::Clusters;
 using namespace esp_matter;
 using namespace esp_matter::endpoint;
 
-/******************************************************************************/
-/*                     EXPORTED TYPES and DEFINITIONS                         */
-/******************************************************************************/
-
-#define NUM_LEDS                         4
-
-/******************************************************************************/
-/*                              PRIVATE DATA                                  */
-/******************************************************************************/
+#define NUM_LEDS 4
 
 static AirGradient ag = AirGradient();
 static CRGB leds[NUM_LEDS];
 
 const char *TAG = "MAIN";
-
-/******************************************************************************/
-/*                              EXPORTED DATA                                 */
-/******************************************************************************/
-
-
-
-/******************************************************************************/
-/*                                FUNCTIONS                                   */
-/******************************************************************************/
-
-
-
-/******************************************************************************/
 
 /* There is possibility to listen for various device events, related for example to setup process */
 static void on_device_event(const ChipDeviceEvent *event, intptr_t arg) {
@@ -83,41 +49,36 @@ static void matter_init(void) {
     esp_matter::start(on_device_event);
 }
 
-static void update_led(int co2){
+static void update_led(int co2) {
     for (size_t i = 0; i < NUM_LEDS; i++) {
-        /* 400 ppm: average outdoor air level.
-         * 400–1,000 ppm: typical level found in occupied spaces with good air exchange.
-         * 1,000–2,000 ppm: level associated with complaints of drowsiness and poor air.
-         * 2,000–5,000 ppm: level associated with headaches, sleepiness, and stagnant, stale, stuffy air. Poor concentration, loss of attention, increased heart rate and slight nausea may also be present.
-         * 5,000 ppm: this indicates unusual air conditions where high levels of other gases could also be present. Toxicity or oxygen deprivation could occur. This is the permissible exposure limit for daily workplace exposures.
-         * 40,000 ppm: this level is immediately harmful due to oxygen deprivation.
-         */
+        // 400 ppm: average outdoor air level.
+        // 400–1,000 ppm: typical level found in occupied spaces with good air exchange.
+        // 1,000–2,000 ppm: level associated with complaints of drowsiness and poor air.
+        // 2,000–5,000 ppm: level associated with headaches, sleepiness, and stagnant, stale, stuffy air. Poor concentration, loss of attention, increased heart rate and slight nausea may also be present.
+        // 5,000 ppm: this indicates unusual air conditions where high levels of other gases could also be present. Toxicity or oxygen deprivation could occur. This is the permissible exposure limit for daily workplace exposures.
+        // 40,000 ppm: this level is immediately harmful due to oxygen deprivation.
         if (co2 < 1000) {
-            /* Excellent */
+            // Excellent
             leds[i] = CRGB::Green;
-        }
-        else if (co2 < 1500) {
-            /* Mediocre */
+        } else if (co2 < 1500) {
+            // Mediocre
             leds[i] = CRGB::Yellow;
-        }
-        else if (co2 < 2000) {
-            /* Unhealthy */
+        } else if (co2 < 2000) {
+            // Unhealthy
             leds[i] = CRGB::Orange;
-        }
-        else if (co2 < 2500) {
-            /* Very unhealthy */
+        } else if (co2 < 2500) {
+            // Very unhealthy
             leds[i] = CRGB::Red;
-        }
-        else {
-            /*  Hazardous. Blink if co2 is too high */
+        } else {
+            // Hazardous. Blink if co2 is too high
             if (millis() % 1000 < 500) {
                 leds[i] = CRGB::Black;
-            }
-            else {
+            } else {
                 leds[i] = CRGB::Purple;
             }
         }
         FastLED.show();
+        // TODO fade to values
     }
 }
 
@@ -149,10 +110,10 @@ void setup() {
 
     /* Matter start */
     matter_init();
-  
+
     bool connected = false;
     int timeout = 0;
-    
+
     do {
         delay(1000);
         chip::DeviceLayer::Internal::ESP32Utils::IsStationConnected(connected);
@@ -160,7 +121,7 @@ void setup() {
             break;
         }
         Serial.println("Waiting for provisioning");
-        
+
         /* Print codes needed to setup Matter device */
         char payloadBuffer[256];
         chip::MutableCharSpan qrCode(payloadBuffer);
@@ -169,8 +130,8 @@ void setup() {
             Serial.print("Matter QR Code: ");
             Serial.println(qrCode.data());
         }
-        
-    } while ((!connected));
+
+    } while (!connected);
     Serial.println("Finished provisioning");
 
     lvgl_gui_sensor_start();
@@ -201,9 +162,17 @@ void loop() {
         mqtt_api_publish(Co2, result.t, PM2, result.rh);
     }
 
+    if (Serial.available()) {
+        // read a single character
+        char c = Serial.read();
+        if (c == 'r') {
+            Serial.println("Resetting...");
+            esp_matter::factory_reset();
+        }
+    }
+
     /* Display the sensors result on the LCD */
     lvgl_gui_print(Co2, result.t, PM2);
     update_led(Co2);
     delay(50);
 }
-
