@@ -1,27 +1,10 @@
-/*
- *  mqtt_api.c
- *
- *  Created on: May 5, 2023
- */
-
-/******************************************************************************/
-/*                              INCLUDE FILES                                 */
-/******************************************************************************/
 
 #include <Arduino.h>
 #include <mqtt_client.h>
 #include "mqtt_api.h"
 
-/******************************************************************************/
-/*                     EXPORTED TYPES and DEFINITIONS                         */
-/******************************************************************************/
-
-#define MQTT_BROKER                      "mqtt://broker.emqx.io"
-#define MQTT_PORT                        1883
-
-/******************************************************************************/
-/*                              PRIVATE DATA                                  */
-/******************************************************************************/
+#define MQTT_BROKER "mqtt://mqtt.airshift.app"
+#define MQTT_PORT 1883
 
 static const char *TAG = "MQTT";
 
@@ -29,28 +12,8 @@ static char client_id[32];
 static esp_mqtt_client_handle_t mqtt_client;
 static bool mqtt_broker_connected = false;
 
-/******************************************************************************/
-/*                              EXPORTED DATA                                 */
-/******************************************************************************/
-
-
-
-/******************************************************************************/
-/*                                FUNCTIONS                                   */
-/******************************************************************************/
-
-
-
-/******************************************************************************/
-
-/*!
- * @brief  MQTT event handler
- * @param  None
- * @retval None
- */
-static esp_err_t mqtt_client_event_handler(esp_mqtt_event_handle_t event){
-
-    switch(event->event_id) {
+static esp_err_t mqtt_client_event_handler(esp_mqtt_event_handle_t event) {
+    switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             mqtt_broker_connected = true;
             ESP_LOG_LEVEL(ESP_LOG_INFO, TAG, "MQTT_EVENT_CONNECTED");
@@ -87,15 +50,12 @@ static esp_err_t mqtt_client_event_handler(esp_mqtt_event_handle_t event){
     return ESP_OK;
 }
 
-/**
- * @brief  Publish sensors data to the topics
- */
-void mqtt_api_publish(int co2, float temp, int pm2, int rh){
+void mqtt_api_publish(int co2, float temp, int pm2, int rh) {
     char topic[64];
     char message[32];
     int32_t msg_id;
 
-    if(mqtt_broker_connected){
+    if (mqtt_broker_connected) {
         /* CO2 */
         sprintf(topic, "co2/%s", client_id);
         sprintf(message, "%d", co2);
@@ -105,7 +65,7 @@ void mqtt_api_publish(int co2, float temp, int pm2, int rh){
         sprintf(topic, "temp/%s", client_id);
         sprintf(message, "%.01f", temp);
         esp_mqtt_client_publish(mqtt_client, topic, message, strlen(message), 0, 0);
-    
+
         /* Humidity */
         sprintf(topic, "rh/%s", client_id);
         sprintf(message, "%d", rh);
@@ -118,16 +78,13 @@ void mqtt_api_publish(int co2, float temp, int pm2, int rh){
     }
 }
 
-/**
- * @brief  Initialize MQTT
- */
-void mqtt_api_init(void){
+void mqtt_api_init(void) {
     /* Use wifi mac default */
     uint8_t mac_addr[6];
     esp_read_mac(mac_addr, ESP_MAC_WIFI_STA);
     sprintf(client_id, "%02X%02X%02X%02X%02X%02X", mac_addr[0],
             mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-            
+
     esp_mqtt_client_config_t mqtt_cfg;
     memset(&mqtt_cfg, 0, sizeof(mqtt_cfg));
     mqtt_cfg.uri = MQTT_BROKER;
@@ -140,4 +97,3 @@ void mqtt_api_init(void){
     ESP_LOG_LEVEL(ESP_LOG_INFO, TAG, "Start MQTT client");
     esp_mqtt_client_start(mqtt_client);
 }
-
